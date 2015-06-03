@@ -1,0 +1,131 @@
+setwd('/Users/ivanliu/Google Drive/ANZ/Multivariate Time Series/Auto_v1.2/R')
+rm(list=ls());gc();source('pairs.r')
+require(data.table);require(forecast);require(caret);require(bit64)
+dt <- fread('../data/Auto_Sector_Growth.csv', data.table=F, na.strings = '')
+dt2 <- fread('../data/Auto_Sector.csv', data.table=F, na.strings = '')
+
+####################
+### Convert Data ###
+####################
+timeLine <- dt[,'Date']
+dt[,1] <- NULL; dt2[,1] <- NULL# 1994/04/01 
+dt <- dt[,c(1:18,20:29,19)];dt2 <- dt2[,c(1:18,20:29,19)]
+rawNames <- colnames(dt);newNames <- c(paste0('Var_', 1:(ncol(dt)-1)), 'Target')
+featMapping <- cbind(rawNames, newNames)
+write.csv(featMapping, file='../Doc/All_feat_mapping_Auto.csv')
+colnames(dt) <- newNames
+
+######################
+### Pre-processing ###
+######################
+### 0. Remove 0 values and impute with predicted trend data
+freq <- 12
+dt <- ts(dt, freq=freq, start = c(1994,4));dt2 <- ts(dt2, freq=freq, start = c(1994,4))
+for(i in 1:ncol(dt)){
+    dt[which(dt[,i]==0),i] <- NA
+    dt[,i] <- na.interp(dt[,i], lambda = NULL)
+}
+for(i in 1:ncol(dt2)){
+    dt2[which(dt2[,i]==0),i] <- NA
+    dt2[,i] <- na.interp(dt2[,i], lambda = NULL)
+}
+write.csv(featMapping, file='../data/Auto_Sector_Growth_Complete.csv')
+
+################################
+### Time Series for Features ###
+################################
+### parameter ###
+period = 2 * freq
+### models ###
+pred <- matrix(nrow = period, ncol = (ncol(dt)-1))
+pred_u_95 <- matrix(nrow = period, ncol = (ncol(dt)-1));pred_l_95 <- matrix(nrow = period, ncol = (ncol(dt)-1))
+pred_u_80 <- matrix(nrow = period, ncol = (ncol(dt)-1));pred_l_80 <- matrix(nrow = period, ncol = (ncol(dt)-1))
+finFeatList <- featMapping[which(featMapping[,2] %in% colnames(dt)),][,1]
+
+for(i in 1:(ncol(dt)-1)){
+    # fit <- auto.arima(dt[,i],seasonal = T)#, stepwise=FALSE, approximation=FALSE
+    fit <- stl(dt[,i], s.window = 'periodic')
+    p <- forecast(fit, h=period)
+    
+    jpeg(paste0('../Img/var_pred/',gsub("[^[:alnum:]]", "", finFeatList[i]),'_var_pred.jpg'))
+    plot(p,main = finFeatList[i])
+    dev.off()
+    jpeg(paste0('../Img/stl/',gsub("[^[:alnum:]]", "", finFeatList[i]),'_stl.jpg'))
+    plot(fit,main = finFeatList[i])
+    dev.off()
+    jpeg(paste0('../Img/acf_pacf/',gsub("[^[:alnum:]]", "", finFeatList[i]),'_acf_pacf.jpg'))
+    par(mfcol = c(2,1))
+    acf(dt[,i]);pacf(dt[,i])
+    par(mfcol = c(1,1))
+    dev.off()
+    
+    pred[,i] <- as.data.frame(p)[,1]
+    pred_u_95[,i] <- as.data.frame(p)[,5]
+    pred_l_95[,i] <- as.data.frame(p)[,4]
+    pred_u_80[,i] <- as.data.frame(p)[,3]
+    pred_l_80[,i] <- as.data.frame(p)[,2]
+}
+
+colnames(pred) <- colnames(dt)[1:(ncol(dt)-1)]
+fit <- auto.arima(dt[,29], xreg = dt[,-29])#, stepwise=FALSE, approximation=FALSE
+p <- forecast(fit, h=period, xreg=pred)
+p_u_95 <- forecast(fit, h=period, xreg=pred_u_95);p_l_95 <- forecast(fit, h=period, xreg=pred_l_95)
+p_u_80 <- forecast(fit, h=period, xreg=pred_u_80);p_l_80 <- forecast(fit, h=period, xreg=pred_l_80)
+
+jpeg(paste0('../Img/forecasting/Production_forecasting_multi',period,'months.jpg'))
+plot(c(dt[,29],rep(NA,length(p$mean))),type = 'l', xaxt='n', ylab='Growth Rate');
+lines(c(dt[,29],p_u_80$mean), col='orange');lines(c(dt[,29],p_l_80$mean), col='orange');
+lines(c(dt[,29],p_u_95$mean), col='blue');lines(c(dt[,29],p_l_95$mean), col='blue')
+lines(c(rep(NA,length(dt[,29])),p$mean), col='red')
+axis(side=1,at=1:length(timeLine),label=timeLine)
+dev.off()
+
+#############
+### Other ###
+#############
+# acf(dt[,29])
+# pacf(dt[,29])
+# seasonplot(dt[,29])
+# accuracy(fit)
+# monthplot(dt[,29])
+# HoltWinters(dt[,29])
+
+###################
+### Correlation ###
+###################
+cor_no_lag <- cor(dt)
+write.csv(cor_no_lag, file='../Doc/Correlation_No_Lag.csv')
+# require(lattice);require(ggplot2)
+# splom(~dt)
+lags <- 24
+cffdf <- matrix(nrow = lags*2+1, ncol = (ncol(dt)+1)) 
+for(i in 1:ncol(dt)){
+    jpeg(paste0('../Img/lag_corr/',gsub("[^[:alnum:]]", "", finFeatList[i]),'_lag_cor.jpg'))
+    cffvalues <- ccf(dt[,i], dt[,29], plot=TRUE, main=paste0(finFeatList[i]," & New Vehicle Sales"), lag.max=lags)
+    cffdf[,1] <- cffvalues$lag; cffdf[,(i+1)] <- cffvalues$acf
+    dev.off()
+}
+colnames(cffdf) <- c('LagNum', rawNames)
+write.csv(cffdf, file='../doc/var_lag_cor.csv', row.names = F)
+
+###############################
+### Convert to Real Numbers ###
+###############################
+stPoint <- dt2[,29][254]
+p_real <- matrix(nrow = length(p$mean), ncol = 5) 
+for(j in 1:5){
+    for(i in 1:length(p$mean)){
+        if(i == 1){
+            p_real[i,j] <- stPoint * (1 + as.data.frame(p)[i,j])
+        }else{
+            p_real[i,j] <- p_real[(i-1),j] * (1 + as.data.frame(p)[i,j])    
+        }
+    } 
+}
+jpeg(paste0('../Img/forecasting/Production_forecasting_multi',period,'months_real.jpg'))
+plot(c(dt2[,29],rep(NA,length(p_real[,1]))),type = 'l', xaxt='n', ylab='Sales Volume', ylim=c(min(dt2[,29],p_real[,4]),max(dt2[,29],p_real[,5])));
+lines(c(dt2[,29],p_real[,3]), col='orange');lines(c(dt2[,29],p_real[,2]), col='orange');
+lines(c(dt2[,29],p_real[,5]), col='blue');lines(c(dt2[,29],p_real[,4]), col='blue')
+lines(c(rep(NA,length(dt2[,29])),p_real[,1]), col='red')
+axis(side=1,at=1:length(timeLine),label=timeLine)
+dev.off()
