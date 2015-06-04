@@ -1,9 +1,9 @@
-setwd('/Users/ivanliu/Google Drive/ANZ/Multivariate Time Series/Auto_v1.2/R')
+setwd('/Users/ivanliu/Google Drive/ANZ/Multivariate Time Series/Auto_v1.3/R')
 rm(list=ls());gc();source('pairs.r')
 require(data.table);require(forecast);require(caret);require(bit64)
 dt <- fread('../data/Auto_Sector_Growth.csv', data.table=F, na.strings = '')
 dt2 <- fread('../data/Auto_Sector.csv', data.table=F, na.strings = '')
-dt <- dt2
+dt2 <- dt
 ####################
 ### Convert Data ###
 ####################
@@ -42,31 +42,31 @@ pred_u_95 <- matrix(nrow = period, ncol = (ncol(dt)-1));pred_l_95 <- matrix(nrow
 pred_u_80 <- matrix(nrow = period, ncol = (ncol(dt)-1));pred_l_80 <- matrix(nrow = period, ncol = (ncol(dt)-1))
 finFeatList <- featMapping[which(featMapping[,2] %in% colnames(dt)),][,1]
 modelInfo <- 
-for(i in 1:(ncol(dt)-1)){
-    fit <- auto.arima(dt[,i],seasonal = T)#, stepwise=FALSE, approximation=FALSE
-    fit2 <- stl(dt[,i], s.window = 'periodic')
-    p <- forecast(fit, h=period)
-    
-    jpeg(paste0('../Image/Forecasting_Predictors/',gsub("[^[:alnum:]]", "", finFeatList[i]),'_var_pred.jpg'),width=600, height=400)
-    plot(p,main = finFeatList[i])
-    dev.off()
-    jpeg(paste0('../Image/STL_diagram/',gsub("[^[:alnum:]]", "", finFeatList[i]),'_stl.jpg'),width=600, height=400)
-    plot(fit2,main = finFeatList[i])
-    dev.off()
-    jpeg(paste0('../Image/ACF_PACF/',gsub("[^[:alnum:]]", "", finFeatList[i]),'_acf_pacf.jpg'),width=600, height=400)
-#     par(mfcol = c(2,1));acf(dt[,i]);pacf(dt[,i]);par(mfcol = c(1,1))
-    tsdisplay(dt[,i],main = finFeatList[i])
-    dev.off()
-    jpeg(paste0('../Image/ACF_PACF_Difference/',gsub("[^[:alnum:]]", "", finFeatList[i]),'_acf_pacf_diff.jpg'),width=600, height=400)
-    tsdisplay(diff(diff(dt[,i],12),12),main = finFeatList[i])
-    dev.off()
-    
-    pred[,i] <- as.data.frame(p)[,1]
-    pred_u_95[,i] <- as.data.frame(p)[,5]
-    pred_l_95[,i] <- as.data.frame(p)[,4]
-    pred_u_80[,i] <- as.data.frame(p)[,3]
-    pred_l_80[,i] <- as.data.frame(p)[,2]
-}
+    for(i in 1:(ncol(dt)-1)){
+        fit <- auto.arima(dt[,i],seasonal = T)#, stepwise=FALSE, approximation=FALSE
+        fit2 <- stl(dt[,i], s.window = 'periodic')
+        p <- forecast(fit, h=period)
+        
+        jpeg(paste0('../Image/Forecasting_Predictors/',gsub("[^[:alnum:]]", "", finFeatList[i]),'_var_pred.jpg'),width=600, height=400)
+        plot(p,main = finFeatList[i])
+        dev.off()
+        jpeg(paste0('../Image/STL_diagram/',gsub("[^[:alnum:]]", "", finFeatList[i]),'_stl.jpg'),width=600, height=400)
+        plot(fit2,main = finFeatList[i])
+        dev.off()
+        jpeg(paste0('../Image/ACF_PACF/',gsub("[^[:alnum:]]", "", finFeatList[i]),'_acf_pacf.jpg'),width=600, height=400)
+        #     par(mfcol = c(2,1));acf(dt[,i]);pacf(dt[,i]);par(mfcol = c(1,1))
+        tsdisplay(dt[,i],main = finFeatList[i])
+        dev.off()
+        jpeg(paste0('../Image/ACF_PACF_Difference/',gsub("[^[:alnum:]]", "", finFeatList[i]),'_acf_pacf_diff.jpg'),width=600, height=400)
+        tsdisplay(diff(diff(dt[,i],12),12),main = finFeatList[i])
+        dev.off()
+        
+        pred[,i] <- as.data.frame(p)[,1]
+        pred_u_95[,i] <- as.data.frame(p)[,5]
+        pred_l_95[,i] <- as.data.frame(p)[,4]
+        pred_u_80[,i] <- as.data.frame(p)[,3]
+        pred_l_80[,i] <- as.data.frame(p)[,2]
+    }
 
 colnames(pred) <- colnames(dt)[1:(ncol(dt)-1)]
 fit <- auto.arima(dt[,29], xreg = dt[,-29])#, stepwise=FALSE, approximation=FALSE
@@ -109,7 +109,7 @@ for(i in 1:ncol(dt)){
     pwx=ar1model$residuals
     newpwy = filter(y, filter = c(1,-(1+ar1model$coef),ar1model$coef), sides =1)
     cffvalues <- ccf(pwx,newpwy,na.action=na.omit,lag.max=lags, plot=T,ylab = "cross-correlation",
-             main=paste0(finFeatList[i]," & New Vehicle Sales"))
+                     main=paste0(finFeatList[i]," & New Vehicle Sales"))
     cffdf[,1] <- cffvalues$lag; cffdf[,(i+1)] <- cffvalues$acf
     dev.off()
 }
