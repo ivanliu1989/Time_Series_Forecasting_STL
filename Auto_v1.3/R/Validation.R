@@ -38,7 +38,8 @@ test = (nrow(dt)-period+1):nrow(dt)
 Error <- matrix(nrow = ncol(dt), ncol = 4, dimnames = list(NULL, c('Features','MeanError','80Error','95Error')))
 finFeatList <- featMapping[which(featMapping[,2] %in% colnames(dt)),][,1]
 for(i in 1:(ncol(dt)-1)){
-    fit <- auto.arima(dt[train,i],seasonal = T, stepwise=FALSE, approximation=FALSE)#
+    fit <- auto.arima(ts(dt[train,i], freq=freq, start = c(1994,4)),seasonal = T, stepwise=FALSE, approximation=FALSE)#
+    # fit2 <- stl(ts(dt[train,i], freq=freq, start = c(1994,4)), s.window = 'periodic')
     p <- forecast(fit, h=period)
     
     jpeg(paste0('../Image/Forecasting_Predictors_Validation/',gsub("[^[:alnum:]]", "", finFeatList[i]),'_validation.jpg'),width=600, height=400)
@@ -55,8 +56,8 @@ for(i in 1:(ncol(dt)-1)){
 }
 
 i <- 29
-fit <- auto.arima(dt[train,29], xreg = dt[train,-c(7,8,27,29)], stepwise=FALSE, approximation=FALSE)#
-p <- forecast(fit, h=period, xreg=dt[test,-c(7,8,27,29)])
+fit <- auto.arima(ts(dt[train,29], freq=freq, start = c(1994,4)), xreg = ts(dt[train,-c(29)], freq=freq, start = c(1994,4)))#, stepwise=FALSE, approximation=FALSE)#
+p <- forecast(fit, h=period, xreg=ts(dt[test,-c(29)], freq=freq, start = c(1994,4)))
 jpeg(paste0('../Image/Forecasting_Target_Validation/',gsub("[^[:alnum:]]", "", finFeatList[i]),'_validation.jpg'),width=600, height=400)
 plot(c(dt[,i]),type = 'l', xaxt='n',main = finFeatList[i],ylim=c(min(dt[,i],p$lower[,2]),max(dt[,i],p$upper[,2])), ylab=finFeatList[i]);
 lines(c(rep(NA,length(dt[train,i])),p$lower[,2]), col='blue');lines(c(rep(NA,length(dt[train,i])),p$lower[,1]), col='orange');
