@@ -24,6 +24,7 @@ finFeatList <- featMapping[which(featMapping[,2] %in% colnames(dt)),][,1]
 # dt <- diff(dt, 1)
 period = 24
 irf_mt <- matrix(nrow = 812, ncol = 6)
+z <- 1
 for(j in 1:29){
     for(i in 1:29){
         if(i!=j){
@@ -31,16 +32,17 @@ for(j in 1:29){
             fit <- VAR(dt[,c(i,j)], p=floor(mean(fit_select$selection)), type='both', season=NULL, ic=c("AIC", "HQ", "SC", "FPE"))
             
             cause <- causality(fit, cause = colnames(dt[,c(i,j)])[1]) #Var_1 do not Granger-cause Target
-            irf_mt[i,1] <- colnames(dt[,c(i,j)])[2]; irf_mt[i,2] <- colnames(dt[,c(i,j)])[1]
-            irf_mt[i,3] <- cause$Granger$p.value; irf_mt[i,4] <- cause$Instant$p.value
+            irf_mt[z,1] <- colnames(dt[,c(i,j)])[2]; irf_mt[z,2] <- colnames(dt[,c(i,j)])[1]
+            irf_mt[z,3] <- cause$Granger$p.value; irf_mt[z,4] <- cause$Instant$p.value
             cause <- causality(fit, cause = colnames(dt[,c(i,j)])[2]) #Target do not Granger-cause Var_1
-            irf_mt[i,5] <- cause$Granger$p.value; irf_mt[i,6] <- cause$Instant$p.value
+            irf_mt[z,5] <- cause$Granger$p.value; irf_mt[z,6] <- cause$Instant$p.value
             
-            irf_fit <- irf(fit, n.ahead=24, ortho=T, cumulative=F, boot=T, ci=.95, runs=100, seed=8)
+            irf_fit <- irf(fit, n.ahead=24, ortho=F, cumulative=F, boot=T, ci=.95, runs=100, seed=8)
             jpeg(paste0('../Image/Impulse_Response/',gsub("[^[:alnum:]]", "", finFeatList[j]),'_to_',gsub("[^[:alnum:]]", "", finFeatList[i]),'.jpg'),width=600, height=400)
             par(mfcol=c(2,2))
             plot(irf_fit, plot.type='single')
             dev.off()
+            z <- z+1
         }
     }
 }
